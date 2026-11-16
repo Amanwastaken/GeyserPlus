@@ -23,18 +23,33 @@ public final class Settings {
             # as a fraction of normal speed. Java Edition is 0.2. Set to 1.0 to disable slowing.
             blocking-speed-multiplier: 0.2
 
-            # Crouch + drop item swaps the held item with the offhand (like F on Java).
-            # While crouching, the drop button no longer drops items.
-            offhand-swap: true
+            # How Bedrock players swap the held item with the offhand (like F on Java):
+            #   double-crouch - tap crouch twice quickly (default)
+            #   crouch-drop   - press drop while crouching (drop no longer drops while crouching)
+            #   off           - disabled
+            offhand-swap: double-crouch
+
+            # For double-crouch: the most time allowed between the two crouch taps, in milliseconds.
+            double-crouch-window-ms: 300
             """;
+
+    public enum SwapTrigger { DOUBLE_CROUCH, CROUCH_DROP, OFF }
 
     public final boolean shieldToggle;
     public final float blockingSpeedMultiplier;
-    public final boolean offhandSwap;
+    public final SwapTrigger offhandSwap;
+    public final long doubleCrouchWindowMillis;
 
     private Settings(Map<String, String> values) {
         this.shieldToggle = Boolean.parseBoolean(values.getOrDefault("shield-toggle", "true"));
-        this.offhandSwap = Boolean.parseBoolean(values.getOrDefault("offhand-swap", "true"));
+        this.offhandSwap = parseTrigger(values.getOrDefault("offhand-swap", "double-crouch"));
+        long window;
+        try {
+            window = Long.parseLong(values.getOrDefault("double-crouch-window-ms", "300"));
+        } catch (NumberFormatException e) {
+            window = 300;
+        }
+        this.doubleCrouchWindowMillis = Math.max(50, Math.min(1000, window));
         float multiplier;
         try {
             multiplier = Float.parseFloat(values.getOrDefault("blocking-speed-multiplier", "0.2"));
@@ -42,6 +57,15 @@ public final class Settings {
             multiplier = 0.2f;
         }
         this.blockingSpeedMultiplier = Math.max(0f, Math.min(1f, multiplier));
+    }
+
+    private static SwapTrigger parseTrigger(String value) {
+        return switch (value.toLowerCase()) {
+            case "crouch-drop" -> SwapTrigger.CROUCH_DROP;
+            case "off", "false", "none" -> SwapTrigger.OFF;
+            // "true" from older configs, or anything unrecognised
+            default -> SwapTrigger.DOUBLE_CROUCH;
+        };
     }
 
     public static Settings load(Path folder) throws IOException {

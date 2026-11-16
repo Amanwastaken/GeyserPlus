@@ -120,8 +120,7 @@ public final class ShieldToggle {
     }
 
     /** Runs every client tick (PlayerAuthInput) to keep the slowdown in sync. */
-    public static void tick(GeyserSession session) {
-        PlayerState state = PlayerState.get(session);
+    public static void tick(GeyserSession session, PlayerState state) {
         if (!state.toggledBlocking) {
             if (!Float.isNaN(state.slowedFrom)) {
                 restoreSpeed(session, state);

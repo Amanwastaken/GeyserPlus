@@ -6,7 +6,10 @@ import org.cloudburstmc.protocol.bedrock.packet.PlayerAuthInputPacket;
 import org.geysermc.geyser.session.GeyserSession;
 import org.geysermc.geyser.translator.protocol.PacketTranslator;
 
-/** Wraps Geyser's own PlayerAuthInput translator (sent by the client every tick). */
+/**
+ * Wraps Geyser's own PlayerAuthInput translator. The client sends this every tick,
+ * so the extra work here is kept to a few field reads per packet.
+ */
 public final class AuthInputTranslator extends PacketTranslator<PlayerAuthInputPacket> {
     private final PacketTranslator<PlayerAuthInputPacket> original;
 
@@ -17,12 +20,14 @@ public final class AuthInputTranslator extends PacketTranslator<PlayerAuthInputP
     @Override
     public void translate(GeyserSession session, PlayerAuthInputPacket packet) {
         Settings settings = ShieldOffhandExtension.settings();
+        boolean wasSneaking = session.isSneaking();
 
-        // Crouch + drop: cancel the drop and swap hands instead
-        boolean swap = false;
-        if (settings.offhandSwap && session.isSneaking()) {
+        // Crouch + drop mode: cancel the drop and swap hands instead
+        boolean crouchDropSwap = false;
+        if (settings.offhandSwap == Settings.SwapTrigger.CROUCH_DROP && wasSneaking
+                && !packet.getPlayerActions().isEmpty()) {
             try {
-                swap = packet.getPlayerActions().removeIf(action -> action.getAction() == PlayerActionType.DROP_ITEM);
+                crouchDropSwap = packet.getPlayerActions().removeIf(action -> action.getAction() == PlayerActionType.DROP_ITEM);
             } catch (UnsupportedOperationException ignored) {
                 // List can't be changed: let the drop happen normally rather than drop and swap
             }
@@ -30,18 +35,29 @@ public final class AuthInputTranslator extends PacketTranslator<PlayerAuthInputP
 
         original.translate(session, packet);
 
-        if (swap) {
-            OffhandSwap.trigger(session);
+        if (crouchDropSwap) {
+            OffhandSwap.onCrouchDrop(session);
+        }
+
+        // Only look up per-player state when something relevant happened or the shield is up
+        boolean startedCrouching = !wasSneaking && session.isSneaking();
+        boolean doubleCrouch = startedCrouching && settings.offhandSwap == Settings.SwapTrigger.DOUBLE_CROUCH;
+        if (!doubleCrouch && !settings.shieldToggle) {
+            return;
+        }
+
+        PlayerState state = PlayerState.get(session);
+        if (doubleCrouch) {
+            OffhandSwap.onCrouchStart(session, state, settings.doubleCrouchWindowMillis);
         }
 
         if (settings.shieldToggle) {
             // Java players can't sprint while blocking
-            if (packet.getInputData().contains(PlayerAuthInputData.START_SPRINTING) && !session.isSneaking()) {
-                if (PlayerState.get(session).toggledBlocking) {
-                    ShieldToggle.lower(session);
-                }
+            if (state.toggledBlocking && !session.isSneaking()
+                    && packet.getInputData().contains(PlayerAuthInputData.START_SPRINTING)) {
+                ShieldToggle.lower(session);
             }
-            ShieldToggle.tick(session);
+            ShieldToggle.tick(session, state);
         }
     }
 

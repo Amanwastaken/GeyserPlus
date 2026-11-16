@@ -17,6 +17,8 @@ public final class PlayerState {
     int ticksSinceSlowSent;
     /** Time of the last offhand swap, to avoid one button press swapping twice. */
     long lastSwapMillis;
+    /** Time the player last started crouching, for double-crouch detection (0 = none pending). */
+    long lastCrouchStartMillis;
 
     public static PlayerState get(GeyserSession session) {
         return STATES.computeIfAbsent(session, s -> new PlayerState());

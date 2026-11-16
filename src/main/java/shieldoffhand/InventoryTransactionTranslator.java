@@ -29,11 +29,11 @@ public final class InventoryTransactionTranslator extends PacketTranslator<Inven
         }
 
         // Crouch + drop (when the client reports the drop this way): swap hands instead
-        if (settings.offhandSwap
+        if (settings.offhandSwap == Settings.SwapTrigger.CROUCH_DROP
                 && type == InventoryTransactionType.NORMAL
                 && session.isSneaking()
                 && isDrop(packet)) {
-            OffhandSwap.trigger(session);
+            OffhandSwap.onCrouchDrop(session);
             return;
         }
 
