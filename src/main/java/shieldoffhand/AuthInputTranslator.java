@@ -3,6 +3,7 @@ package shieldoffhand;
 import org.cloudburstmc.protocol.bedrock.data.PlayerActionType;
 import org.cloudburstmc.protocol.bedrock.data.PlayerAuthInputData;
 import org.cloudburstmc.protocol.bedrock.packet.PlayerAuthInputPacket;
+import org.geysermc.api.util.InputMode;
 import org.geysermc.geyser.session.GeyserSession;
 import org.geysermc.geyser.translator.protocol.PacketTranslator;
 
@@ -39,16 +40,17 @@ public final class AuthInputTranslator extends PacketTranslator<PlayerAuthInputP
             OffhandSwap.onCrouchDrop(session);
         }
 
-        // Only look up per-player state when something relevant happened or the shield is up
+        // Only look up per-player state when something relevant happened or the shield toggle is on
         boolean startedCrouching = !wasSneaking && session.isSneaking();
-        boolean doubleCrouch = startedCrouching && settings.offhandSwap == Settings.SwapTrigger.DOUBLE_CROUCH;
+        boolean rawPress = packet.getInputData().contains(PlayerAuthInputData.SNEAK_PRESSED_RAW);
+        boolean doubleCrouch = settings.offhandSwap == Settings.SwapTrigger.DOUBLE_CROUCH && (startedCrouching || rawPress);
         if (!doubleCrouch && !settings.shieldToggle) {
             return;
         }
 
         PlayerState state = PlayerState.get(session);
         if (doubleCrouch) {
-            OffhandSwap.onCrouchStart(session, state, settings.doubleCrouchWindowMillis);
+            handleCrouchTap(session, state, settings, startedCrouching, rawPress);
         }
 
         if (settings.shieldToggle) {
@@ -58,6 +60,28 @@ public final class AuthInputTranslator extends PacketTranslator<PlayerAuthInputP
                 ShieldToggle.lower(session);
             }
             ShieldToggle.tick(session, state);
+        }
+    }
+
+    /**
+     * Counts crouch-button taps. Keyboard and controller use the raw button press, so it works whether
+     * crouch is set to hold or toggle. Touch uses crouch starts instead, because toggling crouch on
+     * touch is itself a double tap. Clients that don't send raw presses also fall back to crouch starts.
+     */
+    private static void handleCrouchTap(GeyserSession session, PlayerState state, Settings settings,
+                                        boolean startedCrouching, boolean rawPress) {
+        boolean touch = session.inputMode() == InputMode.TOUCH;
+        if (!touch && rawPress) {
+            state.sendsRawSneak = true;
+            long now = System.currentTimeMillis();
+            // A real tap is a separate press; ignore repeats from one held press (one per 50 ms tick)
+            boolean separatePress = now - state.lastRawPressMillis > 75;
+            state.lastRawPressMillis = now;
+            if (separatePress) {
+                OffhandSwap.onCrouchStart(session, state, settings.doubleCrouchWindowMillis);
+            }
+        } else if (startedCrouching && (touch || !state.sendsRawSneak)) {
+            OffhandSwap.onCrouchStart(session, state, settings.doubleCrouchWindowMillis);
         }
     }
 

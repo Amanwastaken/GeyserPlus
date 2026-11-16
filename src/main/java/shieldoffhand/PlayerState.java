@@ -19,6 +19,10 @@ public final class PlayerState {
     long lastSwapMillis;
     /** Time the player last started crouching, for double-crouch detection (0 = none pending). */
     long lastCrouchStartMillis;
+    /** Time of the last raw crouch-button press reported by the client. */
+    long lastRawPressMillis;
+    /** Whether this client reports raw crouch-button presses (Bedrock 1.21.50+). */
+    boolean sendsRawSneak;
 
     public static PlayerState get(GeyserSession session) {
         return STATES.computeIfAbsent(session, s -> new PlayerState());
