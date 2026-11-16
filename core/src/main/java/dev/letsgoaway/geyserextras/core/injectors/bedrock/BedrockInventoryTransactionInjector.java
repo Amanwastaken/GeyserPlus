@@ -1,6 +1,7 @@
 package dev.letsgoaway.geyserextras.core.injectors.bedrock;
 
 import dev.letsgoaway.geyserextras.core.ExtrasPlayer;
+import dev.letsgoaway.geyserextras.core.parity.java.shield.ShieldToggle;
 import org.cloudburstmc.math.vector.Vector3i;
 import org.cloudburstmc.protocol.bedrock.data.definitions.BlockDefinition;
 import org.cloudburstmc.protocol.bedrock.data.inventory.transaction.InventoryTransactionType;
@@ -15,6 +16,8 @@ import org.geysermc.geyser.session.cache.SkullCache;
 import org.geysermc.geyser.translator.inventory.InventoryTranslator;
 import org.geysermc.geyser.translator.protocol.Translator;
 import org.geysermc.geyser.translator.protocol.bedrock.BedrockInventoryTransactionTranslator;
+
+import static dev.letsgoaway.geyserextras.core.GeyserExtras.GE;
 
 // I love it when bedrock randomly sends data in random packets
 // of which the name they have is completely irrelavant to what
@@ -35,7 +38,13 @@ public class BedrockInventoryTransactionInjector extends BedrockInventoryTransac
 
         //SERVER.log("INVENTORY TRANSACTION PACKET: " + packet.getTransactionType().name() + " " + packet.getActionType() + " " + (packet.getBlockPosition() == null ? "null" : packet.getBlockPosition().toString()) + " " + packet.getClickPosition().toString());
         InventoryTransactionType type = packet.getTransactionType();
-        // Trying to do a block interaction, but we should disable the shield first
+        // Use pressed while looking at nothing (action 1): raise/lower the shield like Java Edition
+        if (GE.getConfig().isEnableToggleBlock()
+                && type.equals(InventoryTransactionType.ITEM_USE)
+                && packet.getActionType() == 1
+                && ShieldToggle.handleUsePress(session)) {
+            return;
+        }
 
         super.translate(session, packet);
 

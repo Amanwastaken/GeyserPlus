@@ -2,6 +2,7 @@ package dev.letsgoaway.geyserextras.core.injectors.bedrock;
 
 import dev.letsgoaway.geyserextras.core.ExtrasPlayer;
 import dev.letsgoaway.geyserextras.core.injectors.bedrock.input.BedrockBlockInteractions;
+import dev.letsgoaway.geyserextras.core.parity.java.shield.ShieldToggle;
 import org.cloudburstmc.protocol.bedrock.data.PlayerAuthInputData;
 import org.cloudburstmc.protocol.bedrock.packet.PlayerAuthInputPacket;
 import org.geysermc.api.util.InputMode;
@@ -9,6 +10,8 @@ import org.geysermc.geyser.session.GeyserSession;
 import org.geysermc.geyser.translator.protocol.PacketTranslator;
 import org.geysermc.geyser.translator.protocol.Translator;
 import org.geysermc.geyser.translator.protocol.bedrock.entity.player.input.BedrockPlayerAuthInputTranslator;
+
+import static dev.letsgoaway.geyserextras.core.GeyserExtras.GE;
 
 @Translator(packet = PlayerAuthInputPacket.class)
 // Why is the BedrockPlayerAuthInputTranslator a final class???
@@ -29,6 +32,12 @@ public class BedrockPlayerAuthInputInjector extends PacketTranslator<PlayerAuthI
         for (PlayerAuthInputData input : packet.getInputData()) {
             switch (input) {
                 case PERFORM_BLOCK_ACTIONS -> BedrockBlockInteractions.translate(session, packet.getPlayerActions());
+                case START_SPRINTING -> {
+                    // Java players can't sprint while blocking
+                    if (GE.getConfig().isEnableToggleBlock() && !session.isSneaking()) {
+                        ShieldToggle.lower(session);
+                    }
+                }
                 case MISSED_SWING -> {
                     if (session.inputMode().equals(InputMode.TOUCH)) {
                         player.swingArm();

@@ -39,6 +39,18 @@ public final class GeyserExtrasConfig {
     private boolean enableJavaCombatSounds = true;
 
     @Comment("""
+            Let Bedrock players raise and lower their shield by pressing Use/Place
+            (right click, LT on Xbox, L2 on PlayStation, ZL on Switch), like on Java Edition.
+            This works with a shield in either hand, as long as the item in the main hand
+            does not have its own use (food, bows, potions, pearls, armor and so on).
+            Crouching still raises the shield too.
+            \s
+            WARNING: Bedrock players walk at normal speed while blocking this way, faster than
+            Java players do while blocking. Some anti-cheats may flag this. Test before enabling.
+            """)
+    private boolean enableToggleBlock = false;
+
+    @Comment("""
             Enable the Block Display entity workaround using FMBE. (EXPERIMENTAL)
             Note that the translation is not 100% accurate and some block types might be invisible (candles, doors, campfires),
             where as some blocks will render differently (fence, glass panes, some storage containers).
