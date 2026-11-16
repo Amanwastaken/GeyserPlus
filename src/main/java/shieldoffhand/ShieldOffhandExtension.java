@@ -3,8 +3,12 @@ package shieldoffhand;
 import org.cloudburstmc.protocol.bedrock.packet.InventoryTransactionPacket;
 import org.cloudburstmc.protocol.bedrock.packet.PlayerAuthInputPacket;
 import org.geysermc.event.subscribe.Subscribe;
+import org.geysermc.geyser.api.command.Command;
+import org.geysermc.geyser.api.command.CommandSource;
 import org.geysermc.geyser.api.event.bedrock.SessionDisconnectEvent;
+import org.geysermc.geyser.api.event.lifecycle.GeyserDefineCommandsEvent;
 import org.geysermc.geyser.api.event.lifecycle.GeyserPostInitializeEvent;
+import org.geysermc.geyser.api.event.lifecycle.GeyserPostReloadEvent;
 import org.geysermc.geyser.api.extension.Extension;
 import org.geysermc.geyser.registry.Registries;
 import org.geysermc.geyser.session.GeyserSession;
@@ -27,11 +31,7 @@ public class ShieldOffhandExtension implements Extension {
     @Subscribe
     @SuppressWarnings("unchecked")
     public void onPostInitialize(GeyserPostInitializeEvent event) {
-        try {
-            settings = Settings.load(dataFolder());
-        } catch (IOException e) {
-            logger().error("Could not read config.yml, using defaults: " + e.getMessage());
-        }
+        reloadSettings();
 
         PacketTranslator<PlayerAuthInputPacket> authInput = (PacketTranslator<PlayerAuthInputPacket>)
                 Registries.BEDROCK_PACKET_TRANSLATORS.get(PlayerAuthInputPacket.class);
@@ -46,9 +46,49 @@ public class ShieldOffhandExtension implements Extension {
         Registries.BEDROCK_PACKET_TRANSLATORS.register(PlayerAuthInputPacket.class, new AuthInputTranslator(authInput));
         Registries.BEDROCK_PACKET_TRANSLATORS.register(InventoryTransactionPacket.class, new InventoryTransactionTranslator(transaction));
 
-        logger().info("ShieldOffhand enabled (shield-toggle: " + settings.shieldToggle
-                + ", blocking-speed-multiplier: " + settings.blockingSpeedMultiplier
-                + ", offhand-swap: " + settings.offhandSwap + ")");
+        logger().info("ShieldOffhand enabled. " + describe(settings));
+    }
+
+    /** "geyser reload" keeps our packet handlers registered; just re-read the config. */
+    @Subscribe
+    public void onPostReload(GeyserPostReloadEvent event) {
+        reloadSettings();
+        logger().info("ShieldOffhand config reloaded. " + describe(settings));
+    }
+
+    /** "shieldoffhand reload": re-read config.yml without restarting Geyser or kicking anyone. */
+    @Subscribe
+    public void onDefineCommands(GeyserDefineCommandsEvent event) {
+        event.register(Command.<CommandSource>builder(this)
+                .source(CommandSource.class)
+                .name("reload")
+                .description("Reload the ShieldOffhand config")
+                .permission("shieldoffhand.reload")
+                .executor((source, command, args) -> {
+                    boolean ok = reloadSettings();
+                    source.sendMessage(ok
+                            ? "ShieldOffhand config reloaded. " + describe(settings)
+                            : "Could not read config.yml; kept the previous settings. Check the console.");
+                })
+                .build());
+    }
+
+    /** Reads config.yml. On failure keeps the current settings and returns false. */
+    private boolean reloadSettings() {
+        try {
+            settings = Settings.load(dataFolder());
+            return true;
+        } catch (IOException e) {
+            logger().error("Could not read config.yml: " + e.getMessage());
+            return false;
+        }
+    }
+
+    private static String describe(Settings s) {
+        return "(shield-toggle: " + s.shieldToggle
+                + ", blocking-speed-multiplier: " + s.blockingSpeedMultiplier
+                + ", offhand-swap: " + s.offhandSwap.name().toLowerCase().replace('_', '-')
+                + ", double-crouch-window-ms: " + s.doubleCrouchWindowMillis + ")";
     }
 
     @Subscribe
